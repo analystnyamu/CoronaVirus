@@ -1,0 +1,427 @@
+---
+title: "Coronavirus Modelling (COVID-19) in Kenya"
+author: 'Author: Statistician Nyamu'
+date: "6/26/2020"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+toc: yes
+toc_depth: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#devtools::install_github("RamiKrispin/coronavirus")
+
+# devtools::install_github("tidyverse/tidyr",build_vignettes = T, force=T)
+
+#remotes::install_github("joachim-gassen/tidycovid19")
+
+#remotes::install_github("JohnCoene/coronavirus")
+
+#library(devtools)
+#library(coronavirus)
+library(tidyr)
+library(tidyverse)
+```
+
+# Modeling of COVID-19 (Coronavirus) in Kenya using SIR Model
+
+## Introduction
+
+Epidemics have been some of the most devastating events in humanity. The Black
+Death in medieval Europe wiped out a third of the total population and the Spanish Flu
+in 1918 killed more people than the First World War. In November 2002 to July 2003, SARS (COVID-2), a coronavirus that originated from Beijing, China attached $29$ countries infecting __$8,096$__ people and killed **$774$** people (fatality rate of __$9.6\%$__) [source](https://www.worldometers.info/coronavirus/?). 
+The 2009 pandemic of Swine Flu caused worldwide panic, while outbreaks of the Ebola and Zika viruses are still serious
+problems in the world today. MERS (in 2012) killed __$858$__ people out of the __$2,494$__ infected (fatality rate of $34.4\%$).
+
+The Novel COVID-19 Coronavirus is still spreading rapidly in most of the countries and it seem to continue for a period of time since it has not yet reached the peak in many countries including Kenya. Since January, 2020, a huge number of scientists across the world have been analyzing the spread of Coronavirus from different views and with different strategies and technologies with a hope of coming up with the solution and mitigate its effects on the citizens.
+
+Currently, Mathematicians, statisticians, epidemiologists, and data scientists are at the forefront working to understand how the virus is spreading in order to assist the scientists, hospitals and governments deal with the issues of epidemics and come u with the optimal decisions. The latter led to the publication of a large number of resources about the virus. Therefore, I gathered the resources and organized them into a summarized article using top R resources on Coronavirus.
+
+The subject of epidemiology models the behaviour of diseases and the steps we can take to control
+their impact, including issues like when to vaccinate and quarantine people.
+One of the most important tools in epidemiology is the differential equation. These
+equations model how a disease behaves over time, taking into account factors such as
+the number of susceptible people in the population and the number of people who are
+immune. These article articulate the use of differential equations in infectious disease modelling. 
+The article also suggest the importance of herd immunity and need for an urgent coronavirus vaccination. 
+
+## Motivations and Structure of the article
+
+In order to compile and complete this article while being a novice in R, I replicated analyses done by more knowledgeable people and apply them to my country, that is, Kenya. From all the work done I have gone through, I decided to replicate the analyses done by Antoine Soetewey. Antoine Soetewey article found [here](file:///D:/MASTERS%20NOTES,%202ND%20YEAR/2020%20April%20lecturs/disease%20modeling/practicals/COVID-19%20in%20Belgium%20-%20Stats%20and%20R.html) is based on a mix of articles by Tim Churches and Prof. Dr. Holger K. von Jouanne-Diedrich, who present a very informative analysis on how to model the outbreak of the Coronavirus and show how contagious the disease is. The articles by the two researchers can be found [here](https://blog.ephorie.de/epidemiology-how-contagious-is-novel-coronavirus-2019-ncov) and [here](https://timchurches.github.io/blog/posts/2020-02-18-analysing-covid-19-2019-ncov-outbreak-data-with-r-part-1/). Their articles gave me an understanding on how to model infectious diseases using RStudio. I advice interested readers also to go through their [more recent articles](https://www.statsandr.com/blog/top-r-resources-on-covid-19-coronavirus/#analyzing-covid-19-outbreak-data-with-r) for more advanced analyses for a deeper understanding of the spread of the COVID-19 pandemic.
+
+SIR Model is a deterministic compartmetal  model that divide the population into three compatments: (Susceptible - Infected - Recovered). 
+ 
+ * Susceptible (S) (not infected),
+ 
+ * Infectious (I ), and
+ 
+ * Recovered (R) (that is, vaccinated or recovered with immunity).
+ 
+The SIR model represents how an infection would spread through a
+population since it takes into consideration that some people will recover from the
+disease and never become susceptible. The SIR model assumes that individuals who recover from
+the infection become immune and cannot be infected again.
+
+These groups evolve over time as the virus progresses in the population:
+
+__S__ decreases when individuals are contaminated and move to the infectious group __I__
+As people recover or die, they go from the infected group I to the recovered group R
+To model the dynamics of the outbreak we need three differential equations to describe the rates of change in each group, parameterised by: __$\beta$__ (beta), the transmission rate, which controls the transition between __S__ and __I__; __$\gamma$__ (gamma) , the removal or recovery rate, which controls the transition between __I__ and __R__
+
+The following differential equations will be used with SIR Model without demography
+
+$$\frac{dS}{dt}=-\lambda S   \, \, \, \, \,  ... (i)$$
+
+$$\frac{dI}{dt}= \lambda S - \gamma I \, \, \, \, \,  ... (ii) $$
+
+$$\frac{dR}{dt}= \gamma I    \, \, \, \, \, \, \,  ... (iii) $$
+
+The first equation (i) indicate that the number of susceptible individuals (S) decreases with the number of newly infected individuals, where new infected cases are the result of the infection rate ($\beta$) multiplied by the number of susceptible individuals (S) who had a contact with infectious individuals (I).
+
+The second equation (ii) suggest that the number of infectious individuals (I) increases with the newly infected individuals ($\beta$IS), minus the previously infected people who recovered (i.e., $\gamma$I) which is the removal rate, $\gamma$ multiplied by the infectious individuals I).
+
+Finally, the last equation (iii) states that the recovered group (R) increases with the number of individuals who were infectious and who either recovered or died ($\gamma$ I).
+
+## Model Assumptions
+
+* The number of infected people increases at a rate proportional to both the number
+of infected and the number of susceptible people. The number of susceptible people
+decreases at this same rate. The ratio involved is the transmission rate $\beta$ (beta), the
+same as in the SI model.
+
+* The number of recovered people increases at a rate proportional to the number of
+infected people. The ratio involved is called the recovery rate $\gamma$  (gamma).
+
+* A susceptible person who catches the disease becomes infectious immediately.
+
+Before fitting the SIR model to the data, the first step is to express these differential equations as an R function, with respect to time t.
+
+```{r, echo=TRUE, include=TRUE}
+SIR <- function(time, state, parameters) {
+  par <- as.list(c(state, parameters))
+  with(par, {
+    dS <- -beta * I * S / N
+    dI <- beta * I * S / N - gamma * I
+    dR <- gamma * I
+    list(c(dS, dI, dR))
+  })
+}
+
+```
+
+## Fitting a SIR model to the Coronavirus data in Kenya
+
+To fit the model to the data we need a solver for teh differential equations and an optimiser to find the optimal values for our two unknown parameters $\beta$, and $\gamma$
+
+The function ```ode()``` (for ordinary differential equations) from the ```{deSolve}``` R package makes solving the system of equations easy, and to find the optimal values for the parameters we wish to estimate, we can just use the ```optim()``` function built into base R.
+
+Specifically, what we need to do is minimise the sum of the squared differences between $I(t)$, number of people in the infectious compatment I at time t, and the estimated infected individuals $\hat{I} (t)$. The quantity is the residual sum of squares (RSS):
+
+$$RSS (\beta , \gamma )= \sum_t (I(t) - \hat{I}(t))^{2}$$ 
+
+
+In order to fit a model to the incidence data for Kenya, we need a value N for the initial uninfected population. The current population of Kenya as from July 22, 2020 was __$53,845,750$__ people based on Worldometer elaboration of the latest United Nations data [source](https://www.worldometers.info/world-population/kenya-population/).
+
+Next, we need to create a vector with the daily cumulative incidence for Kenya, from March 13, 2020 (when our daily incidence data started), through to July 21 (last available date at the time of publication of this article). We will then compare the predicted incidence from the SIR model fitted to these data with the actual incidence since March 13. We also need to initialise the values for N, S, I and R. Note that the daily cumulative incidence for kenya is extracted from the {coronavirus} R package developed by Rami Krispin.
+
+```{r, echo=TRUE, include=TRUE, error=TRUE}
+### installation of coronavirus package 
+
+# importing data in r
+coronavirus <-read.csv("coronavirusdata.csv")
+# devtools::install_github("RamiKrispin/coronavirus", force=T)
+
+#Kenya <-coronavirus %>%  filter(country=="Kenya")
+
+# extracting the cumulative incidence
+
+df <-coronavirus %>%
+  group_by(date, type) %>%
+  summarize(total=sum(cases, na.rm=TRUE)) %>%
+  pivot_wider(names_from = type, values_from=total) %>%
+  arrange(date) %>%
+   ungroup() %>%
+   mutate(active = confirmed - death - recovered) %>%
+  mutate(
+    confirmed_cum = cumsum(confirmed),
+    death_cum = cumsum(death),
+    recovered_cum = cumsum(recovered),
+    active_cum = cumsum(active)
+  )
+
+# put the daily coronavirus cumulative incidence numbers for Kenya from
+# March 13 to June 27 into a vector called Infected
+library(lubridate)
+
+sir_start_date <- "2020-03-13"
+sir_end_date <- "2020-07-21"
+
+df$date <- as.Date(df$date, format = "%Y-%m-%d")
+
+Infected <- subset(df, df$date >= "2020-03-13" & df$date <= "2020-07-21")$active_cum
+
+# Create an incrementing Day vector the same length as our
+# cases vector
+Day <- 1:(length(Infected))
+
+# now specify initial values for N, S, I and R
+N <- 53845750
+init <- c(
+  S = N - Infected[1],
+  I = Infected[1],
+  R = 0
+)
+```
+
+Then we need to define a function to calculate the RSS, given a set of values for $\beta$
+ and $\gamma$.
+ 
+```{r, echo=TRUE, include=TRUE, error=TRUE}
+# define a function to calculate the residual sum of squares
+# (RSS), passing in parameters beta and gamma that are to be
+# optimised for the best fit to the incidence data
+RSS <- function(parameters) {
+  names(parameters) <- c("beta", "gamma")
+  out <- ode(y = init, times = Day, func = SIR, parms = parameters)
+  fit <- out[, 3]
+  sum((Infected - fit)^2)
+}
+```
+ 
+Finally, we can fit the SIR model to our data by finding the values for $\beta$ and $\gamma$ that minimise the residual sum of squares between the observed cumulative incidence (observed in Kenya) and the predicted cumulative incidence (predicted by our model). We also need to check for convergence of the model as shown below:
+
+```{r, echo=TRUE, include=TRUE}
+# we calculate the values of beta and gamma that give the
+# smallest RSS, which represents the best fit to the data.
+# we can start with values of 0.8 for each, and restrict them to the range between 0 and 1.0
+
+# install.packages("deSolve")
+library(deSolve)
+
+Opt <- optim(c(0.54, 0.54),
+  RSS,
+  method = "L-BFGS-B",
+  lower = c(0, 0),
+  upper = c(1, 1)
+)
+
+# check for convergence
+Opt$message
+```
+
+The convergence of the model is confirmed. Note that you may find different estimates for different choices of initial values or constraints. This posit that the fitting process is not stable. Here is a potential solution for a better fitting process.
+
+Now we can examine the fitted values for $\beta$ and $\gamma$
+
+
+```{r, echo=TRUE, include=TRUE}
+Opt_par <- setNames(Opt$par, c("beta", "gamma"))
+Opt_par
+```
+
+__NOTE__ that $\beta$ controls the transition between S and I (transmission rate) and $\gamma$ controls the transition between I and R (Recovery rate).
+Nevertheless, those values do not have a much meaning but, we use them to get the fitted numbers of people in each compartment of our SIR model for the dates up to June 27 that were used to fit the model, and compare those fitted values with the observed (real) data.
+
+## Prediction and Graphing
+
+```{r, echo=TRUE, include=TRUE, error=TRUE}
+# time in days for predictions
+t <- 1:as.integer(ymd(sir_end_date) + 1 - ymd(sir_start_date))
+
+# get the fitted values from our SIR model
+fitted_cumulative_incidence <- data.frame(ode(
+  y = init, times = t,
+  func = SIR, parms = Opt_par
+))
+
+# add a Date column and the observed incidence data
+library(dplyr)
+
+fitted_cumulative_incidence <- fitted_cumulative_incidence %>%
+  mutate(
+    Date = ymd(sir_start_date) + days(t - 1),
+    Country = "Kenya",
+    cumulative_incident_cases = Infected
+  )
+
+# plot the data
+library(ggplot2)
+
+fitted_cumulative_incidence %>%
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = I), colour = "red") +
+  geom_point(aes(y = cumulative_incident_cases), colour = "blue") +
+  labs(
+    y = "Cumulative incidence",
+    title = "COVID-19 fitted vs observed cumulative incidence, Kenya",
+    subtitle = "(Red = fitted from SIR model, blue = observed)"
+  ) +
+  theme_minimal()
+```
+
+The graph above suggest that the number of observed confirmed cases deviate from the number of confirmed cases expected by our model. The fact that the observed cases slighly follows the SIR model, suggest that the pandemic in Kenya is not growing exponentially from April. However, as time goes the trend of the data will not follow exponential phase in the long term as coronavirus continue to sprend to more people.
+
+The following graph is similar than the previous one, except that the y-axis is measured on a log scale. This kind of plot is called a semi-log plot or more precisely a log-linear plot because only the y-axis is transformed with a logarithm scale. Transforming the scale in log has the advantage that it is more easily readable in terms of difference between the observed and expected number of confirmed cases and it also shows how the number of observed confirmed cases differs from an exponential trend.
+
+```{r, echo=TRUE, include=TRUE}
+fitted_cumulative_incidence %>%
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = I), colour = "red") +
+  geom_point(aes(y = cumulative_incident_cases), colour = "blue") +
+  labs(
+    y = "Cumulative incidence",
+    title = "COVID-19 fitted vs observed cumulative incidence, Kenya",
+    subtitle = "(Red = fitted from SIR model, blue = observed)"
+  ) +
+  theme_minimal() +
+  scale_y_log10(labels = scales::comma)
+```
+
+The plot indicates that, at the beginning of the pandemic and until June 20, the number of confirmed cases stayed above what would be expected in an exponential phase. In particular, the number of confirmed cases increased day after day from March 13 and then kept increasing at the rate above an exponential rate.
+
+## Reproduction Number $R_0$
+
+Our SIR model looks like a good fit to the observed cumulative incidence data in Kenya, so we can now use our fitted model to calculate the basic reproduction number $R_0$, also referred as basic reproduction ratio, and which depends on transmission rate ($\beta$) and recovery rate ($\gamma$).
+It is a mathematical term tat indicates how contagious an infectious disease is. It gives the avarage number of people who wll contract a contagious diseases from one person with that disease. 
+
+* $R_0 < 1$ means each existing infection causes less than one new infection. In this case, the disease will decline and eventually die out.
+
+* $R_0 = 1$ means each existing infection causes one new infection. The disease will stay alive and stable, but there won't be an outbreak or epidemic.
+
+* $R_0 >1$ means each existing infection causes more than one new infection. The disease will be transmitted between people, and there may be an outbreak or epidemic.
+
+In the SIR model, the basic reproduction number R0 can be calculated using the ratio of the transmission rate to the recovery rate:
+
+$$R_0=\frac{\beta}{\gamma}$$
+
+
+```{r, echo=TRUE, include=TRUE, error=TRUE}
+R0 <- as.numeric(Opt_par[1] / Opt_par[2])
+R0
+```
+
+An $R_0$ of 1.16 is below values found by others for COVID-19 and the $R_0$ for SARS and MERS, which are similar diseases also caused by corovirus. Moreover, in the literature, preliminary studies had estimated reproduction number $R_0$ for COVID-19 to be between 1.5 and 3.5 (with a $\beta$ close to 0.54 and $\gamma$ close to 0.2). The **reproduction number ($R_0$)** of $1.144$ suggest that, on average in **Kenya**, 1.2 persons are infected for each infected person.
+
+## Herd Immunity
+
+Herd immunity occurs when a critical proportion of a susceptible population is immunised against a contagious disease, giving overall protection to the remainder of the unprotected community (herd). This minimises the chance of an outbreak occurring and allows those who are not eligible for vaccines, such as infants and pregnant women, to also receive some protection from the disease. Herd immunity works because it is more difficult for diseases to spread between individuals if large numbers are already immune, as this breaks the chain of infection. 
+
+For simple models, the proportion of the population that needs to be effectively immunized to prevent sustained spread of the disease, known as the **herd immunity threshold**, has to be larger than $(1-\frac{1}{R_0})$. From the analysis the reproduction number of $1.144$ we just calculated suggests that, given the formula $(1-\frac{1}{1.144})$, $12.6 \%$ of the population should be immunized to stop the spread of the infection. With a population in Kenya of approximately **$53.8$ million**, this translates into roughly **$16.5$ million** people.
+
+__An outbreak with a reproductive number of below 1 will gradually disappear. For comparison, the $R_0$ for the common flu is $1.3$ and for SARS it was $2.0$.__
+
+## Using our model to analyze the outbreak if there was no intervention
+
+It is instructive to use our model fitted to the first 105 days of available data on confirmed cases in Kenya, to see what would happen if the outbreak were left to run its course, without **public health intervention**.
+
+```{r, echo=TRUE, include=TRUE, error=TRUE}
+# time in days for predictions
+t <- 1:260
+
+# get the fitted values from our SIR model
+fitted_cumulative_incidence <- data.frame(ode(
+  y = init, times = t,
+  func = SIR, parms = Opt_par
+))
+
+# add a Date column and join the observed incidence data
+fitted_cumulative_incidence <- fitted_cumulative_incidence %>%
+  mutate(
+    Date = ymd(sir_start_date) + days(t - 1),
+    Country = "Kenya",
+    cumulative_incident_cases = c(Infected, rep(NA, length(t) - length(Infected)))
+  )
+
+# plot the data
+fitted_cumulative_incidence %>%
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = I), colour = "red") +
+  geom_line(aes(y = S), colour = "black") +
+  geom_line(aes(y = R), colour = "green") +
+  geom_point(aes(y = cumulative_incident_cases),
+    colour = "blue"
+  ) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(y = "Persons", title = "COVID-19 fitted vs observed cumulative incidence, Kenya") +
+  scale_colour_manual(name = "", values = c(
+    red = "red", black = "black",
+    green = "green", blue = "blue"
+  ), labels = c(
+    "Susceptible",
+    "Recovered", "Observed", "Infectious"
+  )) +
+  theme_minimal()
+```
+
+As the proportion of recovered people increases, the proportion of susceptible people decreases, as shown respectively by the yellow and blue lines. The red line represents the trend of infected individuals, and how their numbers change over time. In this example, both the blue and red lines decrease until they hit zero. This means that the entire population has become infected with the disease and moved into the recovered phase. When the blue line does NOT reach zero, this means the disease has died out before everyone in the population has contracted it.
+
+The same graph in __log scale__ for the y-axis and with a legend for better readability:
+
+```{r, echo=TRUE, include=TRUE, error=TRUE}
+# plot the data
+fitted_cumulative_incidence %>%
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = I, colour = "red")) +
+  geom_line(aes(y = S, colour = "black")) +
+  geom_line(aes(y = R, colour = "green")) +
+  geom_point(aes(y = cumulative_incident_cases, colour = "blue")) +
+  scale_y_log10(labels = scales::comma) +
+  labs(
+    y = "Persons",
+    title = "COVID-19 fitted vs observed cumulative incidence, Kenya"
+  ) +
+  scale_colour_manual(
+    name = "",
+    values = c(red = "red", black = "black", green = "green", blue = "blue"),
+    labels = c("Susceptible", "Observed", "Recovered", "Infectious")
+  ) +
+  theme_minimal()
+```
+
+## Other Summary Statistics
+
+From our fitted __SIR MODEL__ we can compute other intersting statistics that include the following:
+
+* The Peak of the Pandemic
+
+* The number of severe cases
+
+* The number of people who need intensive care
+
+* The number of deaths
+
+```{r, echo=TRUE, include=TRUE}
+fit <- fitted_cumulative_incidence
+
+# peak of pandemic
+
+fit[fit$I == max(fit$I), c("Date", "I")]
+```
+
+
+```{r, echo=TRUE, include=TRUE}
+# deaths with supposed 1.8 % fatality rate
+max_infected <- max(fit$I)
+max_infected * 0.0176
+
+```
+
+
+The predictions with the exact same settings and no intervention or measures undertaken to limit the spread of the pandemic indicate that the peak in Kenya is expected to be reached by the 30th September. In Kenya if no measures or intervention imposed, about $443,720$ people would be __infected__ by the End of September.with about $7,810$ deaths (taking fatality rate of 1.8%).
+
+From the analysis, we can understand why the Government has imposed the current strict containment measures and regulations to reduce the spread of Virus in Kenya.
+
+That said, the above predictions should be taken with a lot of caution although they are based on unrealistic assumptions such as no public health interventions, or strict measures imposed, fixed reproductuction number exetra. Nevertheless, more advanced projections can be done with the help of ```{projection} package``` in R. Moreover, we therefore, need to be more careful and strictly admit to public health interventions and obey to measures and policies imposed by the authority because previous pandemics such as SAR, Spanish Flu, Swine Flu etc have shown that the virus can be a peril to humankind.
+
+The aim of this article was to enlighten on how modeling using simple epidemiological model is done in R....
+
+
+
+
+
+
+
